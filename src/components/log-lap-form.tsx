@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Paperclip, X } from "lucide-react";
+import { refreshData } from "@/app/actions";
 import { Combobox } from "@/components/combobox";
 import { TimeChip } from "@/components/ui";
 import { formatBytes, MAX_FILE_BYTES } from "@/lib/ac";
@@ -38,6 +39,7 @@ export function LogLapForm({ userId, sims, tracks: t0, cars: c0, initialTrack, i
   const [proof, setProof] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [adding, setAdding] = useState<NewItem | null>(null);
+  const [addBusy, setAddBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -66,8 +68,17 @@ export function LogLapForm({ userId, sims, tracks: t0, cars: c0, initialTrack, i
   const simCars = cars.filter((c) => c.sim_id === simId);
 
   const saveNew = async () => {
-    if (!adding) return;
+    if (!adding || addBusy) return;
     setError(null);
+    setAddBusy(true);
+    try {
+      await insertNew(adding);
+    } finally {
+      setAddBusy(false);
+    }
+  };
+
+  const insertNew = async (adding: NewItem) => {
     const folder = adding.folder.trim() || null;
     const url = adding.url.trim() || null;
     if (adding.kind === "track") {
@@ -79,6 +90,7 @@ export function LogLapForm({ userId, sims, tracks: t0, cars: c0, initialTrack, i
       if (error) return setError(error.code === "23505" ? "That track and layout already exists. Pick it from the list." : friendly(error.message));
       setTracks((l) => [...l, data as Track]);
       setTrackId(data.id);
+      void refreshData("catalog");
     } else {
       const { data, error } = await supabase
         .from("cars")
@@ -88,6 +100,7 @@ export function LogLapForm({ userId, sims, tracks: t0, cars: c0, initialTrack, i
       if (error) return setError(error.code === "23505" ? "That car already exists. Pick it from the list." : friendly(error.message));
       setCars((l) => [...l, data as Car]);
       setCarId(data.id);
+      void refreshData("catalog");
     }
     setAdding(null);
   };
@@ -95,6 +108,7 @@ export function LogLapForm({ userId, sims, tracks: t0, cars: c0, initialTrack, i
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (adding) return setError(`Finish adding the new ${adding.kind} first, or cancel it.`);
     if (!trackId || !carId) return setError("Pick a track and a car.");
     if (!ms) return setError("That lap time doesn't look right. Try something like 1:31.510.");
     const sec = sectors.map((s) => (s.trim() ? parseSector(s) : null));
@@ -139,6 +153,7 @@ export function LogLapForm({ userId, sims, tracks: t0, cars: c0, initialTrack, i
 
     const status: LapStatus = record === undefined || ms < record ? "record" : myBest === undefined || ms < myBest ? "pb" : "slow";
     setResult({ lapId: lap.id, ms, status, gap: record === undefined ? null : ms - record, prevPb: myBest ?? null, trackId, carId, failed });
+    await refreshData("laps", "catalog");
     setBusy(false);
     router.refresh();
   };
@@ -214,7 +229,7 @@ export function LogLapForm({ userId, sims, tracks: t0, cars: c0, initialTrack, i
           <input className="field" type="url" value={adding.url} onChange={(e) => setAdding({ ...adding, url: e.target.value })} placeholder="Mod download link (optional)" aria-label="Mod download link" />
           <p className="text-xs text-muted">The folder name lets ghosts and setups install to the right place.</p>
           <div className="flex gap-2">
-            <button type="button" className="btn btn-primary btn-sm" onClick={saveNew} disabled={adding.name.trim().length < 2}>Add {adding.kind}</button>
+            <button type="button" className="btn btn-primary btn-sm" onClick={saveNew} disabled={addBusy || adding.name.trim().length < 2}>{addBusy ? "Adding…" : `Add ${adding.kind}`}</button>
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAdding(null)}>Cancel</button>
           </div>
         </div>

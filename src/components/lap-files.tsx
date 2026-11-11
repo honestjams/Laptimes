@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Download, FolderDown, Paperclip, Trash2 } from "lucide-react";
+import { refreshData } from "@/app/actions";
 import { formatBytes, getAcFolder, installPath, installToAc, supportsFolderAccess } from "@/lib/ac";
 import { createClient } from "@/lib/supabase/client";
 import type { LapFile } from "@/lib/types";
@@ -67,6 +68,7 @@ export function LapFiles({
     setBusy(f.id);
     const { error } = await supabase.from("lap_files").delete().eq("id", f.id);
     if (!error && f.uploaded_by === meId) await supabase.storage.from("lap-files").remove([f.storage_path]);
+    await refreshData("laps");
     setBusy(null);
     router.refresh();
   };
@@ -77,6 +79,7 @@ export function LapFiles({
     setMsg(null);
     const failed = await attachFiles(supabase, meId, lapId, Array.from(list));
     setMsg(failed.length ? { ok: false, text: `Couldn't upload: ${failed.join(", ")} (50 MB max each)` } : { ok: true, text: "Uploaded." });
+    await refreshData("laps");
     setBusy(null);
     router.refresh();
   };

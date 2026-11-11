@@ -2,31 +2,27 @@ import Link from "next/link";
 import { Crown } from "lucide-react";
 import { H2HPicker } from "@/components/h2h-picker";
 import { PageHeader, TimeChip } from "@/components/ui";
-import { getMe } from "@/lib/data";
-import { createClient } from "@/lib/supabase/server";
+import { TrackMap } from "@/components/media";
+import { getDrivers, getH2H, getMe, type H2HBest } from "@/lib/data";
 import { formatGap, trackLabel } from "@/lib/time";
-import type { Car, Lap, Track } from "@/lib/types";
 
 export const metadata = { title: "Head to head" };
-type Best = Lap & { track: Pick<Track, "name" | "layout">; car: Pick<Car, "name"> };
+type Best = H2HBest;
 
 export default async function H2HPage({ searchParams }: PageProps<"/h2h">) {
   const sp = await searchParams;
-  const supabase = await createClient();
-  const me = await getMe();
-  const { data: all } = await supabase.from("profiles").select("id,username,display_name").order("display_name").limit(5000);
-  const drivers = all ?? [];
+  const [me, drivers] = await Promise.all([getMe(), getDrivers()]);
   const str = (v: string | string[] | undefined) => (typeof v === "string" ? v.toLowerCase() : "");
   const a = drivers.find((d) => d.username === (str(sp.a) || me?.username));
   const b = drivers.find((d) => d.username === str(sp.b));
 
-  let rows: { key: string; href: string; label: string; car: string; a?: Best; b?: Best }[] = [];
+  let rows: { key: string; href: string; label: string; car: string; image_url: string | null; a?: Best; b?: Best }[] = [];
   if (a && b && a.id !== b.id) {
-    const { data } = await supabase.from("best_laps").select("*, track:tracks(name,layout), car:cars(name)").in("driver_id", [a.id, b.id]).limit(10000);
+    const data = await getH2H(a.id, b.id);
     const m = new Map<string, (typeof rows)[number]>();
-    for (const l of (data ?? []) as unknown as Best[]) {
+    for (const l of data) {
       const key = `${l.track_id}-${l.car_id}`;
-      const r = m.get(key) ?? { key, href: `/combo/${l.track_id}/${l.car_id}`, label: trackLabel(l.track), car: l.car.name };
+      const r = m.get(key) ?? { key, href: `/combo/${l.track_id}/${l.car_id}`, label: trackLabel(l.track), car: l.car.name, image_url: l.track.image_url };
       if (l.driver_id === a.id) r.a = l;
       else r.b = l;
       m.set(key, r);
@@ -79,8 +75,9 @@ export default async function H2HPage({ searchParams }: PageProps<"/h2h">) {
                 const tie = r.a!.time_ms === r.b!.time_ms;
                 return (
                   <li key={r.key} className="px-3 py-3 sm:px-4">
-                    <Link href={r.href} className="block truncate text-sm font-bold hover:text-accent">
-                      {r.label} <span className="font-normal text-muted">· {r.car}</span>
+                    <Link href={r.href} className="flex items-center gap-2 text-sm font-bold hover:text-accent">
+                      <TrackMap track={{ name: r.label, image_url: r.image_url }} sizes="64px" className="h-8 w-12 shrink-0 rounded-md" />
+                      <span className="truncate">{r.label} <span className="font-normal text-muted">· {r.car}</span></span>
                     </Link>
                     <div className="mt-1.5 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                       <div><TimeChip ms={r.a!.time_ms} status={aw || tie ? "pb" : "slow"} /></div>

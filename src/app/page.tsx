@@ -1,25 +1,19 @@
 import Link from "next/link";
 import { ArrowRight, Crown, Plus } from "lucide-react";
+import { CatalogCard } from "@/components/catalog-card";
 import { LapRow } from "@/components/lap-row";
+import { Avatar, CarPhoto, TrackMap } from "@/components/media";
 import { DriverLink, Legend, Stat, TimeChip } from "@/components/ui";
-import { getComboRecords, getLapStatuses, getMe, getRecentLaps } from "@/lib/data";
-import { createClient } from "@/lib/supabase/server";
+import { getComboRecords, getHomeData } from "@/lib/data";
 import { trackLabel } from "@/lib/time";
+import type { ComboRecord } from "@/lib/types";
 
 export default async function Home() {
-  const supabase = await createClient();
-  const [me, records, recent, lapCount, driverCount] = await Promise.all([
-    getMe(),
-    getComboRecords(),
-    getRecentLaps(10),
-    supabase.from("laps").select("id", { count: "exact", head: true }).eq("is_hidden", false),
-    supabase.from("profiles").select("id", { count: "exact", head: true }),
-  ]);
-  const statuses = await getLapStatuses(recent);
+  const [records, home] = await Promise.all([getComboRecords(), getHomeData()]);
 
   // "Who is the king": records held in combos where at least two drivers have set a time.
   const contested = records.filter((r) => r.driver_count > 1);
-  const crowns = new Map<string, { driver: (typeof records)[number]["driver"]; n: number }>();
+  const crowns = new Map<string, { driver: ComboRecord["driver"]; n: number }>();
   for (const r of contested) {
     const c = crowns.get(r.driver_id) ?? { driver: r.driver, n: 0 };
     c.n++;
@@ -27,34 +21,79 @@ export default async function Home() {
   }
   const kings = [...crowns.values()].sort((a, b) => b.n - a.n).slice(0, 5);
 
+  // Busiest tracks: most combos, with the outright fastest lap there.
+  const byTrack = new Map<number, { rec: ComboRecord; cars: number }>();
+  for (const r of records) {
+    const t = byTrack.get(r.track_id);
+    if (!t) byTrack.set(r.track_id, { rec: r, cars: 1 });
+    else {
+      t.cars++;
+      if (r.time_ms < t.rec.time_ms) t.rec = r;
+    }
+  }
+  const tracks = [...byTrack.values()].sort((a, b) => b.cars - a.cars).slice(0, 6);
+  // The closest fight on the site makes the hero picture.
+  const spotlight = contested.find((r) => r.track.image_url && r.car.image_url) ?? records.find((r) => r.track.image_url && r.car.image_url);
+
   return (
     <div className="space-y-8">
-      <section className="card relative overflow-hidden p-6 sm:p-10">
-        <div className="eyebrow mb-3">Sim racing lap times</div>
-        <h1 className="font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
-          Go <span className="text-record">purple</span>.
-          <br />
-          Rub it in.
-        </h1>
-        <p className="mt-4 max-w-md text-muted">
-          Log a lap in ten seconds, see exactly how far off the record you are, and grab the ghost of the lap you&apos;re chasing.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link href={me ? "/log" : "/signup"} className="btn btn-primary">
-            <Plus size={18} strokeWidth={3} /> {me ? "Log a lap" : "Sign up and log a lap"}
-          </Link>
-          <Link href="/leaderboards" className="btn btn-ghost">
-            Leaderboards <ArrowRight size={16} />
-          </Link>
+      <section className="card relative grid overflow-hidden lg:grid-cols-5">
+        <div className="p-6 sm:p-10 lg:col-span-3">
+          <div className="eyebrow mb-3">Sim racing lap times</div>
+          <h1 className="font-display text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-6xl">
+            Go <span className="text-record">purple</span>.
+            <br />
+            Rub it in.
+          </h1>
+          <p className="mt-4 max-w-md text-muted">Log a lap in ten seconds, see exactly how far off the record you are, and grab the ghost of the lap you&apos;re chasing.</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href="/log" className="btn btn-primary">
+              <Plus size={18} strokeWidth={3} /> Log a lap
+            </Link>
+            <Link href="/leaderboards" className="btn btn-ghost">
+              Leaderboards <ArrowRight size={16} />
+            </Link>
+          </div>
+          <div className="kerb mt-8" />
         </div>
-        <div className="kerb mt-8" />
+        {spotlight && (
+          <Link href={`/combo/${spotlight.track_id}/${spotlight.car_id}`} className="group relative block min-h-56 border-t border-line lg:col-span-2 lg:border-l lg:border-t-0">
+            <CarPhoto car={spotlight.car} sizes="(min-width: 1024px) 420px, 100vw" eager className="absolute inset-0" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+            <TrackMap track={spotlight.track} sizes="128px" eager className="absolute right-3 top-3 h-20 w-28 rounded-xl shadow-card" />
+            <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+              <div className="text-[11px] font-extrabold uppercase tracking-widest opacity-80">Record to beat</div>
+              <div className="truncate font-display text-lg font-extrabold">{trackLabel(spotlight.track)}</div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm opacity-90">{spotlight.car.name} · {spotlight.driver.display_name}</span>
+                <TimeChip ms={spotlight.time_ms} status="record" />
+              </div>
+            </div>
+          </Link>
+        )}
       </section>
 
       <section className="grid grid-cols-3 gap-3">
-        <Stat label="Laps logged" value={lapCount.count ?? 0} />
+        <Stat label="Laps logged" value={home.lapCount} />
         <Stat label="Track and car combos" value={records.length} tone="record" />
-        <Stat label="Drivers" value={driverCount.count ?? 0} tone="accent" />
+        <Stat label="Drivers" value={home.driverCount} tone="accent" />
       </section>
+
+      {tracks.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-end justify-between">
+            <h2 className="font-display text-lg font-bold">Busiest tracks</h2>
+            <Link href="/tracks" className="text-sm font-bold text-accent">All tracks</Link>
+          </div>
+          <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
+            {tracks.map(({ rec, cars }, i) => (
+              <div key={rec.track_id} className="w-64 shrink-0 snap-start sm:w-auto">
+                <CatalogCard kind="track" id={rec.track_id} name={trackLabel(rec.track)} image_url={rec.track.image_url} sub={rec.track.country} best={rec.time_ms} footer={`${cars} ${cars === 1 ? "car" : "cars"} · fastest in the ${rec.car.name}`} eager={i < 3} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-8 lg:grid-cols-5">
         <section className="min-w-0 lg:col-span-3">
@@ -63,10 +102,10 @@ export default async function Home() {
             <Legend />
           </div>
           <ul className="card divide-y divide-line">
-            {recent.map((lap) => (
-              <LapRow key={lap.id} lap={lap} status={statuses.get(lap.id) ?? "slow"} />
+            {home.laps.map((lap) => (
+              <LapRow key={lap.id} lap={lap} status={home.statuses[lap.id] ?? "slow"} />
             ))}
-            {recent.length === 0 && <li className="p-6 text-center text-sm text-muted">No laps yet. Be the first.</li>}
+            {home.laps.length === 0 && <li className="p-6 text-center text-sm text-muted">No laps yet. Be the first.</li>}
           </ul>
         </section>
 
@@ -79,7 +118,8 @@ export default async function Home() {
               {kings.map((k, i) => (
                 <li key={k.driver.id} className="flex items-center gap-3 px-4 py-3">
                   <span className="w-5 font-mono text-sm font-bold text-muted">{i + 1}</span>
-                  <DriverLink d={k.driver} className="flex-1" />
+                  <Avatar name={k.driver.display_name} seed={k.driver.username} size={32} />
+                  <DriverLink d={k.driver} className="min-w-0 flex-1 truncate" />
                   <span className="font-mono text-sm font-bold text-record">{k.n}</span>
                   <span className="text-xs text-muted">records</span>
                 </li>
@@ -96,12 +136,15 @@ export default async function Home() {
                 .filter((r) => r.driver_count === 1)
                 .slice(0, 5)
                 .map((r) => (
-                  <li key={`${r.track_id}-${r.car_id}`} className="flex items-center gap-3 px-4 py-3">
-                    <Link href={`/combo/${r.track_id}/${r.car_id}`} className="min-w-0 flex-1 hover:text-accent">
-                      <div className="truncate text-sm font-bold">{trackLabel(r.track)}</div>
-                      <div className="truncate text-xs text-muted">{r.car.name} · only {r.driver.display_name} so far</div>
+                  <li key={`${r.track_id}-${r.car_id}`}>
+                    <Link href={`/combo/${r.track_id}/${r.car_id}`} className="flex items-center gap-3 px-3 py-2.5 hover:bg-surface-2">
+                      <TrackMap track={r.track} sizes="64px" className="h-11 w-16 shrink-0 rounded-lg" />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-bold">{trackLabel(r.track)}</div>
+                        <div className="truncate text-xs text-muted">{r.car.name} · only {r.driver.display_name} so far</div>
+                      </div>
+                      <TimeChip ms={r.time_ms} status="record" size="sm" />
                     </Link>
-                    <TimeChip ms={r.time_ms} status="record" size="sm" />
                   </li>
                 ))}
             </ul>

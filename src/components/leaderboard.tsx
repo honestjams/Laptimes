@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Paperclip } from "lucide-react";
+import { Avatar } from "@/components/media";
 import { DriverLink, TimeChip, Verified } from "@/components/ui";
 import type { MyCrew } from "@/lib/data";
 import { formatDate, formatGap, formatLapTime } from "@/lib/time";
@@ -127,6 +128,7 @@ export function Leaderboard({ laps, meId, crews }: { laps: Row[]; meId: string |
               )}
               <div className="flex items-center gap-3 px-3 py-3 sm:px-4">
                 <span className={`w-6 shrink-0 text-center font-display text-sm font-extrabold ${i === 0 ? "text-record" : "text-muted"}`}>{i + 1}</span>
+                <Avatar name={l.driver.display_name} seed={l.driver.username} />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2">
                     <DriverLink d={l.driver} />

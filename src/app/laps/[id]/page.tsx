@@ -4,7 +4,8 @@ import { ExternalLink } from "lucide-react";
 import { LapActions } from "@/components/lap-actions";
 import { LapFiles } from "@/components/lap-files";
 import { DriverLink, TimeChip, Verified } from "@/components/ui";
-import { getLapStatuses, getMe, LAP_FULL } from "@/lib/data";
+import { CarPhoto, TrackMap } from "@/components/media";
+import { getLapStatus, getMe, LAP_FULL } from "@/lib/data";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatGap, formatLapTime, trackLabel } from "@/lib/time";
 import { ASSISTS, type LapFile, type LapFull } from "@/lib/types";
@@ -16,18 +17,16 @@ export default async function LapPage({ params }: PageProps<"/laps/[id]">) {
   const lapId = Number(id);
   if (!Number.isInteger(lapId)) notFound();
   const supabase = await createClient();
-  const me = await getMe();
-  const { data } = await supabase.from("laps").select(LAP_FULL).eq("id", lapId).maybeSingle();
-  if (!data) notFound();
-  const lap = data as unknown as LapFull;
-
-  const [{ data: files }, statuses, { data: rec }, { data: sim }] = await Promise.all([
+  // one round of queries, all at once
+  const [me, { data }, { data: files }, status] = await Promise.all([
+    getMe(),
+    supabase.from("laps").select(`${LAP_FULL}, sim:tracks(sims(slug))`).eq("id", lapId).maybeSingle(),
     supabase.from("lap_files").select("*").eq("lap_id", lapId).order("created_at"),
-    getLapStatuses([lap]),
-    supabase.from("combo_records").select("time_ms").eq("track_id", lap.track_id).eq("car_id", lap.car_id).maybeSingle(),
-    supabase.from("sims").select("slug").eq("id", lap.track.sim_id).maybeSingle(),
+    getLapStatus(lapId),
   ]);
-  const status = statuses.get(lap.id) ?? "slow";
+  if (!data) notFound();
+  const lap = data as unknown as LapFull & { sim: { sims: { slug: string } | null } | null };
+  const { data: rec } = await supabase.from("combo_records").select("time_ms").eq("track_id", lap.track_id).eq("car_id", lap.car_id).maybeSingle();
   const gap = rec?.time_ms != null ? lap.time_ms - (rec.time_ms as number) : 0;
   const used = ASSISTS.filter((a) => lap[a.key]);
   const sectors = [lap.s1_ms, lap.s2_ms, lap.s3_ms];
@@ -43,7 +42,12 @@ export default async function LapPage({ params }: PageProps<"/laps/[id]">) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="card p-6 text-center">
+      <div className="card overflow-hidden text-center">
+        <div className="grid grid-cols-2">
+          <TrackMap track={lap.track} sizes="(min-width: 672px) 336px, 50vw" eager className="aspect-[16/9] w-full" />
+          <CarPhoto car={lap.car} sizes="(min-width: 672px) 336px, 50vw" eager className="aspect-[16/9] w-full border-l border-line" />
+        </div>
+        <div className="border-t border-line p-6">
         {lap.is_hidden && <div className="tag mb-3 !bg-accent !text-accent-ink">Hidden from leaderboards</div>}
         <Link href={`/combo/${lap.track_id}/${lap.car_id}`} className="eyebrow hover:text-ink">
           {trackLabel(lap.track)} · {lap.car.name}
@@ -67,6 +71,7 @@ export default async function LapPage({ params }: PageProps<"/laps/[id]">) {
             ))}
           </div>
         )}
+        </div>
       </div>
 
       <dl className="card divide-y divide-line">
@@ -99,7 +104,7 @@ export default async function LapPage({ params }: PageProps<"/laps/[id]">) {
         files={(files ?? []) as LapFile[]}
         trackFolder={lap.track.ac_folder}
         carFolder={lap.car.ac_folder}
-        isAc={sim?.slug === "ac"}
+        isAc={lap.sim?.sims?.slug === "ac"}
         meId={me?.id ?? null}
         canAttach={isOwner}
         isAdmin={!!me?.is_admin}

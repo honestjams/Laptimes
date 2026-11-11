@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { refreshData } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 
 export function ResolveReport({ id }: { id: number }) {
@@ -22,6 +23,7 @@ export function ResolveClaim({ id }: { id: number }) {
     if (approve && !confirm("Move all of this driver's laps to the person asking? This can't be undone.")) return;
     const { error } = await supabase.rpc("resolve_claim", { p_request_id: id, p_approve: approve });
     if (error) return setErr(error.message);
+    await refreshData("laps", "profiles");
     router.refresh();
   };
   return (

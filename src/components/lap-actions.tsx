@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { EyeOff, Flag, Trash2 } from "lucide-react";
+import { refreshData } from "@/app/actions";
 import { createClient } from "@/lib/supabase/client";
 
 export function LapActions({ lapId, storagePaths, meId, isOwner, isAdmin, isHidden, backHref }: { lapId: number; storagePaths: string[]; meId: string | null; isOwner: boolean; isAdmin: boolean; isHidden: boolean; backHref: string }) {
@@ -17,12 +18,14 @@ export function LapActions({ lapId, storagePaths, meId, isOwner, isAdmin, isHidd
     if (isOwner && storagePaths.length) await supabase.storage.from("lap-files").remove(storagePaths);
     const { error } = await supabase.from("laps").delete().eq("id", lapId);
     if (error) return setMsg(error.message);
+    await refreshData("laps");
     router.push(backHref);
     router.refresh();
   };
   const hide = async () => {
     const { error } = await supabase.from("laps").update({ is_hidden: !isHidden }).eq("id", lapId);
     if (error) return setMsg(error.message);
+    await refreshData("laps");
     router.refresh();
   };
   const report = async () => {

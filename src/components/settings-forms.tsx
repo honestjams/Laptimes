@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { FolderOpen } from "lucide-react";
+import { refreshData } from "@/app/actions";
 import { forgetAcFolder, getAcFolder, pickAcFolder, supportsFolderAccess } from "@/lib/ac";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,6 +16,7 @@ export function ProfileForm({ id, displayName, bio }: { id: string; displayName:
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     const { error } = await supabase.from("profiles").update({ display_name: name.trim(), bio: about.trim() || null }).eq("id", id);
+    if (!error) await refreshData("profiles");
     setMsg(error ? error.message : "Saved.");
     router.refresh();
   };

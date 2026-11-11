@@ -14,6 +14,18 @@ Built with Next.js (App Router, TypeScript), Tailwind CSS and Supabase (Postgres
 - **Files**: attach a ghost, setup, replay or screenshot to a lap. In Chrome or Edge on desktop, pick your `Documents/Assetto Corsa` folder once in Settings and files install to the right subfolder with one click; other browsers get a normal download.
 - **Crews**: private groups with their own records, joined by invite code.
 - **Moderation**: report button, and an admin page to hide laps and approve driver claims.
+- **Track maps and car photos** on every page: galleries at `/tracks` and `/cars`, picture headers on leaderboards, and thumbnails in lap lists. Admins (or whoever added a track or car) can upload a picture from its page.
+
+## Pictures
+
+Seeded maps and photos are freely licensed images from Wikimedia Commons, resized to WebP and stored in `public/catalog`. Each one's author and licence is stored with the track or car and listed at `/credits`, which the footer links to. Uploaded pictures go to the `catalog` storage bucket. In dark mode, track maps are colour-inverted so they sit on the dark cards.
+
+## Speed
+
+- Public data (leaderboards, catalogue, profiles) is read without the visitor's session and cached on the server, so most pages render in a few milliseconds. Any change made through the app clears the matching cache straight away (`src/app/actions.ts`); a 60 second refresh is the backstop.
+- Vercel runs the functions in Sydney (`vercel.json`), next to the Supabase database.
+- Images go through Next's image optimiser with a short list of sizes, and only the first row of a gallery loads eagerly.
+- The charting library only downloads on driver profile pages, and the database client only on pages that write data.
 
 ## Run it locally
 
@@ -26,7 +38,7 @@ The Supabase URL and publishable key live in `.env`. They are public by design (
 
 ## Database
 
-The schema, security policies and storage bucket are in `supabase/migrations/0001_init.sql`.
+Migrations are in `supabase/migrations/`, applied in order.
 
 Laps imported from the original spreadsheet belong to "placeholder" drivers. A real person takes one over by signing up and pressing "these are my laps" on that driver's page; an admin approves it at `/admin`.
 

@@ -1,13 +1,16 @@
 import { notFound } from "next/navigation";
 import { EntityPage } from "@/components/entity-page";
-import { createClient } from "@/lib/supabase/server";
+import { getEntityData } from "@/lib/data";
+import { trackLabel } from "@/lib/time";
+import type { Track } from "@/lib/types";
 
 export default async function Page({ params }: PageProps<"/tracks/[id]">) {
-  const { id } = await params;
-  const n = Number(id);
+  const n = Number((await params).id);
   if (!Number.isInteger(n)) notFound();
-  const supabase = await createClient();
-  const { data } = await supabase.from("tracks").select("*").eq("id", n).maybeSingle();
-  if (!data) notFound();
-  return <EntityPage kind="track" entity={data} />;
+  return <EntityPage kind="track" id={n} />;
+}
+
+export async function generateMetadata({ params }: PageProps<"/tracks/[id]">) {
+  const { entity } = await getEntityData("track", Number((await params).id) || 0);
+  return { title: entity ? trackLabel(entity as Track) : "Not found" };
 }

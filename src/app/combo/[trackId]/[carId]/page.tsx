@@ -2,11 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Leaderboard } from "@/components/leaderboard";
-import { Legend, PageHeader } from "@/components/ui";
-import { DRIVER, getMe, getMyCrews } from "@/lib/data";
-import { createClient } from "@/lib/supabase/server";
+import { CarPhoto, TrackMap } from "@/components/media";
+import { Legend } from "@/components/ui";
+import { getComboData, getMe, getMyCrews } from "@/lib/data";
 import { trackLabel } from "@/lib/time";
-import type { Car, DriverLite, Lap, Track } from "@/lib/types";
 
 export default async function ComboPage({ params }: PageProps<"/combo/[trackId]/[carId]">) {
   const { trackId, carId } = await params;
@@ -14,36 +13,35 @@ export default async function ComboPage({ params }: PageProps<"/combo/[trackId]/
   const cid = Number(carId);
   if (!Number.isInteger(tid) || !Number.isInteger(cid)) notFound();
 
-  const supabase = await createClient();
-  const me = await getMe();
-  const [{ data: track }, { data: car }, { data: laps }, crews] = await Promise.all([
-    supabase.from("tracks").select("*").eq("id", tid).maybeSingle(),
-    supabase.from("cars").select("*").eq("id", cid).maybeSingle(),
-    supabase.from("laps").select(`*, ${DRIVER}`).eq("track_id", tid).eq("car_id", cid).eq("is_hidden", false).order("time_ms").order("created_at").limit(2000),
-    getMyCrews(me?.id),
-  ]);
-  if (!track || !car) notFound();
-  const t = track as Track;
-  const c = car as Car;
+  const [{ track: t, car: c, laps }, me] = await Promise.all([getComboData(tid, cid), getMe()]);
+  if (!t || !c) notFound();
+  const crews = await getMyCrews(me?.id);
 
   return (
     <>
-      <PageHeader eyebrow="Leaderboard" title={trackLabel(t)}>
+      <section className="card mb-5 grid overflow-hidden sm:grid-cols-2">
+        <Link href={`/tracks/${t.id}`} className="group relative block">
+          <TrackMap track={t} sizes="(min-width: 640px) 480px, 100vw" eager className="aspect-[16/9] w-full" />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 pt-8 text-white">
+            <div className="text-[10px] font-extrabold uppercase tracking-widest opacity-80">Track</div>
+            <h1 className="truncate font-display text-xl font-extrabold group-hover:underline">{trackLabel(t)}</h1>
+          </div>
+        </Link>
+        <Link href={`/cars/${c.id}`} className="group relative block border-t border-line sm:border-l sm:border-t-0">
+          <CarPhoto car={c} sizes="(min-width: 640px) 480px, 100vw" eager className="aspect-[16/9] w-full" />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-3 pt-8 text-white">
+            <div className="text-[10px] font-extrabold uppercase tracking-widest opacity-80">Car{c.class ? ` · ${c.class}` : ""}</div>
+            <div className="truncate font-display text-xl font-extrabold group-hover:underline">{c.name}</div>
+          </div>
+        </Link>
+      </section>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-display text-lg font-bold">Leaderboard</h2>
         <Link href={`/log?track=${t.id}&car=${c.id}`} className="btn btn-primary btn-sm">
           <Plus size={16} strokeWidth={3} /> Log a lap here
         </Link>
-      </PageHeader>
-      <div className="-mt-3 mb-5 flex flex-wrap items-center gap-2 text-sm">
-        <Link href={`/cars/${c.id}`} className="font-bold hover:text-accent">
-          {c.name}
-        </Link>
-        {c.class && <span className="tag">{c.class}</span>}
-        <span className="text-muted">·</span>
-        <Link href={`/tracks/${t.id}`} className="text-muted hover:text-ink">
-          All cars at this track
-        </Link>
       </div>
-      <Leaderboard laps={(laps ?? []) as unknown as (Lap & { driver: DriverLite })[]} meId={me?.id ?? null} crews={crews} />
+      <Leaderboard laps={laps} meId={me?.id ?? null} crews={crews} />
       <div className="mt-4">
         <Legend />
       </div>
@@ -53,10 +51,6 @@ export default async function ComboPage({ params }: PageProps<"/combo/[trackId]/
 
 export async function generateMetadata({ params }: PageProps<"/combo/[trackId]/[carId]">) {
   const { trackId, carId } = await params;
-  const supabase = await createClient();
-  const [{ data: t }, { data: c }] = await Promise.all([
-    supabase.from("tracks").select("name,layout").eq("id", Number(trackId) || 0).maybeSingle(),
-    supabase.from("cars").select("name").eq("id", Number(carId) || 0).maybeSingle(),
-  ]);
-  return { title: t && c ? `${trackLabel(t)} · ${c.name}` : "Leaderboard" };
+  const { track, car } = await getComboData(Number(trackId) || 0, Number(carId) || 0);
+  return { title: track && car ? `${trackLabel(track)} · ${car.name}` : "Leaderboard" };
 }

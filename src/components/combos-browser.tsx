@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { CatalogCard } from "@/components/catalog-card";
+import { CarPhoto, TrackMap } from "@/components/media";
 import { TimeChip, Verified } from "@/components/ui";
 import { trackLabel } from "@/lib/time";
 import type { ComboRecord } from "@/lib/types";
@@ -78,7 +80,11 @@ export function CombosBrowser({ records }: { records: ComboRecord[] }) {
         <ul className="card divide-y divide-line">
           {filtered.map((r) => (
             <li key={`${r.track_id}-${r.car_id}`}>
-              <Link href={`/combo/${r.track_id}/${r.car_id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
+              <Link href={`/combo/${r.track_id}/${r.car_id}`} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-surface-2 sm:px-4">
+                <div className="flex shrink-0">
+                  <TrackMap track={r.track} sizes="64px" className="h-11 w-16 rounded-lg" />
+                  <CarPhoto car={r.car} sizes="64px" className="-ml-3 hidden h-11 w-16 rounded-lg ring-2 ring-surface sm:block" />
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-bold">{trackLabel(r.track)}</div>
                   <div className="truncate text-sm text-muted">
@@ -98,26 +104,21 @@ export function CombosBrowser({ records }: { records: ComboRecord[] }) {
           {filtered.length === 0 && <li className="p-8 text-center text-sm text-muted">Nothing matches that search.</li>}
         </ul>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {groups.map((g) => (
-            <li key={g.id}>
-              <Link href={`/${view}/${g.id}`} className="card block p-4 transition-transform hover:-translate-y-0.5 active:scale-[0.99]">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate font-bold">{g.name}</div>
-                    <div className="text-xs text-muted">{g.sub}</div>
-                  </div>
-                  <TimeChip ms={g.best.time_ms} status="record" size="sm" />
-                </div>
-                <div className="mt-3 text-xs text-muted">
-                  {g.combos} {view === "tracks" ? (g.combos === 1 ? "car" : "cars") : g.combos === 1 ? "track" : "tracks"} · fastest:{" "}
-                  {view === "tracks" ? g.best.car.name : trackLabel(g.best.track)} ({g.best.driver.display_name})
-                </div>
-              </Link>
-            </li>
+            <CatalogCard
+              key={g.id}
+              kind={view === "tracks" ? "track" : "car"}
+              id={g.id}
+              name={g.name}
+              image_url={view === "tracks" ? g.best.track.image_url : g.best.car.image_url}
+              sub={g.sub}
+              best={g.best.time_ms}
+              footer={`${g.combos} ${view === "tracks" ? (g.combos === 1 ? "car" : "cars") : g.combos === 1 ? "track" : "tracks"} · fastest: ${view === "tracks" ? g.best.car.name : trackLabel(g.best.track)} (${g.best.driver.display_name})`}
+            />
           ))}
-          {groups.length === 0 && <li className="card p-8 text-center text-sm text-muted sm:col-span-2">Nothing matches that search.</li>}
-        </ul>
+          {groups.length === 0 && <div className="card p-8 text-center text-sm text-muted sm:col-span-2 lg:col-span-3">Nothing matches that search.</div>}
+        </div>
       )}
     </div>
   );

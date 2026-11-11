@@ -4,12 +4,13 @@ import { Swords } from "lucide-react";
 import { ClaimButton } from "@/components/claim-button";
 import { Coverage, type Cell } from "@/components/coverage";
 import { LapRow } from "@/components/lap-row";
-import { ProfileCharts, type ChartLap } from "@/components/profile-charts";
-import { Legend, PageHeader, Stat } from "@/components/ui";
-import { getMe, LAP_FULL } from "@/lib/data";
-import { createClient } from "@/lib/supabase/server";
+import { Avatar } from "@/components/media";
+import { ProfileCharts } from "@/components/profile-charts-lazy";
+import type { ChartLap } from "@/components/profile-charts";
+import { Legend, Stat } from "@/components/ui";
+import { getDriverData, getMe } from "@/lib/data";
 import { trackLabel } from "@/lib/time";
-import type { LapFull, LapStatus, Profile } from "@/lib/types";
+import type { LapFull, LapStatus } from "@/lib/types";
 
 export async function generateMetadata({ params }: PageProps<"/drivers/[username]">) {
   return { title: decodeURIComponent((await params).username) };
@@ -17,19 +18,11 @@ export async function generateMetadata({ params }: PageProps<"/drivers/[username
 
 export default async function DriverPage({ params }: PageProps<"/drivers/[username]">) {
   const { username } = await params;
-  const supabase = await createClient();
-  const { data: p } = await supabase.from("profiles").select("*").eq("username", decodeURIComponent(username).toLowerCase()).maybeSingle();
-  if (!p) notFound();
-  const driver = p as Profile;
-  const me = await getMe();
-
-  const [{ data: lapData }, { data: recs }] = await Promise.all([
-    supabase.from("laps").select(LAP_FULL).eq("driver_id", driver.id).eq("is_hidden", false).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(3000),
-    supabase.from("combo_records").select("lap_id,driver_count").eq("driver_id", driver.id),
-  ]);
-  const laps = (lapData ?? []) as unknown as LapFull[];
-  const recordIds = new Set((recs ?? []).map((r) => r.lap_id as number));
-  const contested = (recs ?? []).filter((r) => (r.driver_count as number) > 1).length;
+  const [data, me] = await Promise.all([getDriverData(decodeURIComponent(username).toLowerCase()), getMe()]);
+  if (!data) notFound();
+  const { driver, laps } = data;
+  const recordIds = new Set(data.records.map((r) => r.lap_id));
+  const contested = data.records.filter((r) => r.driver_count > 1).length;
 
   // best lap per combo
   const best = new Map<string, LapFull>();
@@ -49,17 +42,24 @@ export default async function DriverPage({ params }: PageProps<"/drivers/[userna
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow={driver.is_placeholder ? "Imported driver, not yet claimed" : `@${driver.username}`} title={driver.display_name}>
-        {me && me.id !== driver.id && (
-          <Link href={`/h2h?a=${me.username}&b=${driver.username}`} className="btn btn-ghost btn-sm">
-            <Swords size={15} /> Head to head
-          </Link>
-        )}
-        {driver.is_placeholder && me && <ClaimButton placeholderId={driver.id} meId={me.id} name={driver.display_name} />}
-      </PageHeader>
-      {driver.bio && <p className="-mt-3 max-w-prose text-muted">{driver.bio}</p>}
+      <div className="flex flex-wrap items-center gap-4">
+        <Avatar name={driver.display_name} seed={driver.username} size={64} />
+        <div className="min-w-0 flex-1">
+          <div className="eyebrow mb-1">{driver.is_placeholder ? "Imported driver, not yet claimed" : `@${driver.username}`}</div>
+          <h1 className="truncate font-display text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl">{driver.display_name}</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {me && me.id !== driver.id && (
+            <Link href={`/h2h?a=${me.username}&b=${driver.username}`} className="btn btn-ghost btn-sm">
+              <Swords size={15} /> Head to head
+            </Link>
+          )}
+          {driver.is_placeholder && me && <ClaimButton placeholderId={driver.id} meId={me.id} name={driver.display_name} />}
+        </div>
+      </div>
+      {driver.bio && <p className="max-w-prose text-muted">{driver.bio}</p>}
       {driver.is_placeholder && !me && (
-        <p className="-mt-3 text-sm text-muted">
+        <p className="text-sm text-muted">
           Is this you? <Link href={`/signup?next=/drivers/${driver.username}`} className="font-bold text-accent">Sign up</Link> to claim these laps.
         </p>
       )}

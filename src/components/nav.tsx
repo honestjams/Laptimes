@@ -1,19 +1,26 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Flag, Home, LogOut, Moon, Plus, Settings, Shield, Sun, Swords, Trophy, User, Users } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { Home, LogOut, Moon, Plus, Settings, Shield, Sun, Swords, Trophy, User } from "lucide-react";
 
 type Me = { username: string; display_name: string; is_admin: boolean } | null;
 
 const LINKS = [
-  { href: "/leaderboards", label: "Leaderboards", icon: Trophy },
-  { href: "/drivers", label: "Drivers", icon: Flag },
-  { href: "/h2h", label: "Head to head", icon: Swords },
-  { href: "/crews", label: "Crews", icon: Users },
+  { href: "/leaderboards", label: "Leaderboards" },
+  { href: "/tracks", label: "Tracks" },
+  { href: "/cars", label: "Cars" },
+  { href: "/drivers", label: "Drivers" },
+  { href: "/h2h", label: "Head to head" },
+  { href: "/crews", label: "Crews" },
 ];
+
+/** Thin bar under a nav link while its page loads. Always rendered so nothing shifts. */
+function PendingBar() {
+  const { pending } = useLinkStatus();
+  return <span aria-hidden className={`pointer-events-none absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-accent transition-opacity duration-150 ${pending ? "animate-pulse opacity-100" : "opacity-0"}`} />;
+}
 
 function ThemeToggle() {
   const [theme, setTheme] = useState<string | null>(null);
@@ -36,13 +43,15 @@ function ThemeToggle() {
   );
 }
 
-export function Nav({ me }: { me: Me }) {
+export function Nav({ me, pending = false }: { me: Me; pending?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [menu, setMenu] = useState(false);
   const active = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   const signOut = async () => {
+    // Loaded on demand so the database client isn't in every page's JavaScript.
+    const { createClient } = await import("@/lib/supabase/client");
     await createClient().auth.signOut();
     setMenu(false);
     router.push("/");
@@ -56,22 +65,25 @@ export function Nav({ me }: { me: Me }) {
           <Link href="/" className="font-display text-lg font-extrabold tracking-tight">
             LAP<span className="text-accent">TIMES</span>
           </Link>
-          <nav className="ml-4 hidden items-center gap-1 sm:flex">
+          <nav className="ml-3 hidden items-center gap-0.5 md:flex">
             {LINKS.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                className={`relative rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors ${
                   active(l.href) ? "bg-surface-2 text-ink" : "text-muted hover:text-ink"
                 }`}
               >
                 {l.label}
+                <PendingBar />
               </Link>
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
-            {me ? (
+            {pending ? (
+              <span className="h-9 w-24 animate-pulse rounded-xl bg-surface-2" aria-hidden />
+            ) : me ? (
               <>
                 <Link href="/log" className="btn btn-primary btn-sm hidden sm:inline-flex">
                   <Plus size={16} strokeWidth={3} /> Log a lap
@@ -108,6 +120,14 @@ export function Nav({ me }: { me: Me }) {
             )}
           </div>
         </div>
+        <nav className="flex gap-1 overflow-x-auto border-t border-line px-3 py-1.5 md:hidden" aria-label="Sections">
+          {LINKS.map((l) => (
+            <Link key={l.href} href={l.href} className={`relative shrink-0 rounded-full px-3 py-1.5 text-xs font-bold ${active(l.href) ? "bg-ink text-bg" : "bg-surface-2 text-muted"}`}>
+              {l.label}
+              <PendingBar />
+            </Link>
+          ))}
+        </nav>
       </header>
 
       {/* Phone: thumb-reach tab bar with the main action in the middle */}
@@ -125,7 +145,7 @@ export function Nav({ me }: { me: Me }) {
             <span className="mt-0.5 text-[10px] font-bold">Log lap</span>
           </Link>
           <Tab href="/h2h" label="H2H" icon={Swords} on={active("/h2h")} />
-          <Tab href="/crews" label="Crews" icon={Users} on={active("/crews")} />
+          <Tab href={me ? `/drivers/${me.username}` : "/login"} label={me ? "Me" : "Sign in"} icon={User} on={!!me && pathname === `/drivers/${me.username}`} />
         </div>
       </nav>
     </>
@@ -142,9 +162,10 @@ function MenuLink({ href, icon: Icon, label, close }: { href: string; icon: type
 
 function Tab({ href, label, icon: Icon, on }: { href: string; label: string; icon: typeof User; on: boolean }) {
   return (
-    <Link href={href} className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-[10px] font-bold ${on ? "text-accent" : "text-muted"}`}>
+    <Link href={href} className={`relative flex min-h-[56px] flex-col items-center justify-center gap-0.5 text-[10px] font-bold ${on ? "text-accent" : "text-muted"}`}>
       <Icon size={20} />
       {label}
+      <PendingBar />
     </Link>
   );
 }

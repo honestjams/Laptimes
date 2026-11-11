@@ -26,6 +26,9 @@ export type Track = {
   ac_layout: string | null;
   is_mod: boolean;
   download_url: string | null;
+  image_url: string | null;
+  image_credit: string | null;
+  image_source_url: string | null;
   created_by: string | null;
 };
 export type Car = {
@@ -37,6 +40,9 @@ export type Car = {
   ac_folder: string | null;
   is_mod: boolean;
   download_url: string | null;
+  image_url: string | null;
+  image_credit: string | null;
+  image_source_url: string | null;
   created_by: string | null;
 };
 
