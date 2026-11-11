@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --bg: #f6f4ef;
+  --surface: #ffffff;
+  --surface-2: #ece9e1;
+  --line: #dcd8cd;
+  --ink: #16171c;
+  --muted: #6a6c76;
+  --accent: #e63e1f;
+  --accent-ink: #ffffff;
+  --record: #7e22ce;
+  --pb: #15803d;
+  --slow: #a16207;
+  --record-bg: #f1e3fd;
+  --pb-bg: #dcf5e4;
+  --slow-bg: #fbf0c4;
+  --shadow: 0 1px 2px rgb(22 23 28 / 0.06), 0 8px 24px -12px rgb(22 23 28 / 0.18);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #0e0f13;
+  --surface: #181a21;
+  --surface-2: #22252e;
+  --line: #2c303b;
+  --ink: #f2f1ec;
+  --muted: #9a9dab;
+  --accent: #ff4d2e;
+  --accent-ink: #14080a;
+  --record: #c084fc;
+  --pb: #4ade80;
+  --slow: #facc15;
+  --record-bg: #2b1a40;
+  --pb-bg: #12301f;
+  --slow-bg: #33290a;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -16px rgb(0 0 0 / 0.7);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-record: var(--record);
+  --color-pb: var(--pb);
+  --color-slow: var(--slow);
+  --color-record-bg: var(--record-bg);
+  --color-pb-bg: var(--pb-bg);
+  --color-slow-bg: var(--slow-bg);
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-unbounded), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+  --shadow-card: var(--shadow);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: var(--shadow);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0 1.1rem;
+    border-radius: 0.8rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    transition: transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s, opacity 0.15s;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:active {
+    transform: scale(0.96);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.08);
+  }
+  .btn-ghost {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .btn-ghost:hover {
+    filter: brightness(0.97);
+  }
+  .btn-sm {
+    min-height: 36px;
+    padding: 0 0.8rem;
+    font-size: 0.85rem;
+    border-radius: 0.65rem;
+  }
+  .field {
+    width: 100%;
+    min-height: 46px;
+    padding: 0.6rem 0.85rem;
+    border-radius: 0.8rem;
+    border: 1.5px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 16px; /* stops iOS zooming on focus */
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .field:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+    letter-spacing: 0.02em;
+  }
+  .eyebrow {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    background: var(--surface-2);
+    color: var(--muted);
+    white-space: nowrap;
+  }
+}
+
+/* Kerb stripe: the red/white edge of a race track, used as a divider. */
+.kerb {
+  height: 6px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0 18px, var(--surface) 18px 36px);
+  border-radius: 999px;
+  opacity: 0.9;
+}
+
+@keyframes record-flash {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--record) 70%, transparent); transform: scale(0.9); }
+  40% { transform: scale(1.08); }
+  100% { box-shadow: 0 0 0 28px transparent; transform: scale(1); }
+}
+.record-flash {
+  animation: record-flash 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) 2;
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.rise {
+  animation: rise 0.35s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .record-flash, .rise { animation: none; }
+  .btn { transition: none; }
+  html { scroll-behavior: auto; }
+}
